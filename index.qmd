@@ -1,6 +1,6 @@
 ---
 title: "Monte Carlo Simulation"
-author: "Your name"
+author: "Michael Nsiah-Nimo"
 format: html
 ---
 
@@ -37,10 +37,37 @@ The distance between the origin and the end of the chain $(x,y,z)$ can be calcul
 Write a function that takes $n$ and returns the distance between the start and end points of a chain. 
 Use vector-based operations to increase the efficiency of your function.
 
+```{r}
+unconstrained_chain <- function(n) {
+  # angles
+  theta <- runif(n, 0, 2*pi)
+  phi   <- runif(n, 0, pi)
+  
+  # components
+  x <- cos(theta) * sin(phi)
+  y <- sin(theta) * sin(phi)
+  z <- cos(phi)
+  
+  # end-to-end distance
+  R <- sqrt((sum(x))^2 + (sum(y))^2 + (sum(z))^2)
+  return(R)
+}
+```
+
 
 ## Distribution of Unconstrained Links
 
 Simulate 10000 chains and save the distribution of the end-to-end distance.
+
+```{r}
+
+set.seed(7292)
+N_sim <- 10000
+n_links <- 50  # or whatever value assigned
+
+R_unconstrained <- replicate(N_sim, unconstrained_chain(n_links))
+
+```
 
 
 
@@ -56,9 +83,84 @@ We can do this by checking the angle between adjacent links after choosing a ran
 Write a function that takes $n$ and returns the distance between the start and end points of a chain. 
 Can you think of a way to use vectorized functions to accomplish this task? Why or why not? 
 
+- **Vectorization won’t work here** because each new link depends on the direction of the link before it. We have to check the angle and redraw until it meets the 45° rule, so each step must be done one at a time. Since the steps aren’t independent, a loop is required
+
+```{r}
+constrained_chain <- function(n) {
+  # First link direction
+  theta <- runif(1, 0, 2*pi)
+  phi   <- runif(1, 0, pi)
+  
+  prev_vec <- c(cos(theta)*sin(phi),
+                sin(theta)*sin(phi),
+                cos(phi))
+  
+  X <- prev_vec
+  
+  for (i in 2:n) {
+    repeat {
+      # generate trial direction
+      theta <- runif(1, 0, 2*pi)
+      phi   <- runif(1, 0, pi)
+      
+      new_vec <- c(cos(theta)*sin(phi),
+                   sin(theta)*sin(phi),
+                   cos(phi))
+      
+      # angle between prev_vec and new_vec
+      angle <- acos(sum(prev_vec * new_vec))  # dot product
+      
+      if (angle >= pi/4) {   # 45 degrees
+        break
+      }
+    }
+    
+    # new_vec
+    X <- rbind(X, new_vec)
+    prev_vec <- new_vec
+  }
+  
+  # compute R
+  end_point <- colSums(X)
+  R <- sqrt(sum(end_point^2))
+  return(R)
+}
+```
+
+
 ## Distribution of Constrained Links
 
 Simulate 10000 chains and save the distribution of the end-to-end distance.
 Plot the density of the unconstrained links and the density of constrained links on the same plot -- how much has the distribution changed?
+
+```{r}
+set.seed(7292)
+R_constrained <- replicate(N_sim, constrained_chain(n_links))
+
+```
+
+## Plot 
+
+```{r}
+library(ggplot2)
+
+df <- data.frame(
+  R = c(R_unconstrained, R_constrained),
+  type = rep(c("Unconstrained", "Constrained"),
+             each = length(R_unconstrained))
+)
+
+ggplot(df, aes(R, color = type)) +
+  geom_density(size = 1.1) +
+  labs(title = "End-to-End Distance: Constrained vs Unconstrained Polymers",
+       x = "Distance R",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+
+- We see a clear shift in the distribution of the end-to-end distance. The constrained chains have larger average end-to-end distance and a more concentrated density, while the unconstrained chains have shorter distances and a broader spread. The 45° constraint makes the chain effectively stiffer and less able to fold back on itself, so the polymer ends up further from the origin.
+
 
 
